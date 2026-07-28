@@ -61,8 +61,23 @@ export function createObservability(provider: k8s.Provider, namespaces: Namespac
         values: {
             deploymentMode: "SingleBinary",
             loki: {
+                auth_enabled: false,
+                commonConfig: { replication_factor: 1 },
+                schemaConfig: {
+                    configs: [{
+                        from: "2026-07-01",
+                        store: "tsdb",
+                        object_store: "filesystem",
+                        schema: "v13",
+                        index: { prefix: "index_", period: "24h" },
+                    }],
+                },
                 storage: { type: "filesystem" },
             },
+            chunksCache: { enabled: false },
+            resultsCache: { enabled: false },
+            lokiCanary: { enabled: false },
+            test: { enabled: false },
             singleBinary: {
                 replicas: 1,
                 persistence: {
