@@ -37,6 +37,7 @@ location failure requires recovery, not automatic failover.
 4. Create an R2 S3 access key limited to the backup bucket.
 5. Create a tagged Tailscale OAuth client for the Kubernetes Operator. Its ACL
    tag must be allowed to create the private Infisical proxy.
+6. Enable HTTPS in the tailnet before creating the Infisical ingress.
 
 ## Stack Setup
 

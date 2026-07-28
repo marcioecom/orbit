@@ -103,7 +103,10 @@ export function createInfisical(
     const tailnetIngress = new k8s.networking.v1.Ingress("infisical-tailnet", {
         metadata: {
             namespace: namespaces.secrets.metadata.name,
-            annotations: { "tailscale.com/tags": "tag:k8s" },
+            annotations: {
+                "tailscale.com/hostname": "infisical",
+                "tailscale.com/tags": "tag:k8s",
+            },
         },
         spec: {
             ingressClassName: "tailscale",
@@ -113,6 +116,7 @@ export function createInfisical(
                     port: { number: 8080 },
                 },
             },
+            tls: [{ hosts: ["infisical"] }],
         },
     }, { provider, dependsOn: instance });
 

@@ -58,6 +58,10 @@ export const secrets = {
     ),
 };
 
+if (!settings.tailscale.enabled) {
+    throw new Error("tailscaleOperatorEnabled must remain true while Infisical uses a tailnet-only ingress.");
+}
+
 if (settings.echo.postgresPassword === undefined || settings.echo.valkeyPassword === undefined) {
     throw new Error(
         "Set the secret configuration values orbit:echoPostgresPassword and orbit:echoValkeyPassword before deploying data services.",

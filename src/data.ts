@@ -58,7 +58,7 @@ export function createDataServices(
             backup: {
                 barmanObjectStore: {
                     destinationPath: `s3://${settings.cloudflare.backupBucketName}/cnpg/echo-postgres`,
-                    endpointURL: `https://${required.cloudflareAccountId}.r2.cloudflarestorage.com`,
+                    endpointURL: `https://${required.cloudflareAccountId}.eu.r2.cloudflarestorage.com`,
                     s3Credentials: {
                         accessKeyId: { name: backupCredentials.metadata.name, key: "ACCESS_KEY_ID" },
                         secretAccessKey: { name: backupCredentials.metadata.name, key: "SECRET_ACCESS_KEY" },

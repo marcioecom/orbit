@@ -21,7 +21,7 @@ export function createEdge(
             ACCESS_KEY_ID: required.backupAccessKeyId,
             SECRET_ACCESS_KEY: required.backupSecretAccessKey,
             BUCKET_NAME: backupBucket.name,
-            ENDPOINT: `https://${required.cloudflareAccountId}.r2.cloudflarestorage.com`,
+            ENDPOINT: `https://${required.cloudflareAccountId}.eu.r2.cloudflarestorage.com`,
         },
     }, { provider });
 
