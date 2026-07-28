@@ -38,6 +38,7 @@ export const settings = {
         valkeyPassword: config.getSecret("echoValkeyPassword"),
     },
     infisical: {
+        siteUrl: config.get("infisicalSiteUrl"),
         encryptionKey: config.getSecret("infisicalEncryptionKey"),
         authSecret: config.getSecret("infisicalAuthSecret"),
         postgresPassword: config.getSecret("infisicalPostgresPassword"),
@@ -69,13 +70,14 @@ if (settings.echo.postgresPassword === undefined || settings.echo.valkeyPassword
 }
 
 if (
+    settings.infisical.siteUrl === undefined ||
     settings.infisical.encryptionKey === undefined ||
     settings.infisical.authSecret === undefined ||
     settings.infisical.postgresPassword === undefined ||
     settings.infisical.redisPassword === undefined
 ) {
     throw new Error(
-        "Set the Infisical secret configuration values before deploying secrets management.",
+        "Set orbit:infisicalSiteUrl and the Infisical secret configuration values before deploying secrets management.",
     );
 }
 
@@ -97,6 +99,7 @@ export const required = {
     echoPostgresPassword: settings.echo.postgresPassword!,
     echoValkeyPassword: settings.echo.valkeyPassword!,
     infisicalEncryptionKey: settings.infisical.encryptionKey!,
+    infisicalSiteUrl: settings.infisical.siteUrl!,
     infisicalAuthSecret: settings.infisical.authSecret!,
     infisicalPostgresPassword: settings.infisical.postgresPassword!,
     infisicalRedisPassword: settings.infisical.redisPassword!,

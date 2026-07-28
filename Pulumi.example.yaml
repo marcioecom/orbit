@@ -7,6 +7,7 @@ config:
   orbit:backupBucketName: orbit-eu-backups
   orbit:cloudflaredEnabled: false
   orbit:tailscaleOperatorEnabled: true
+  orbit:infisicalSiteUrl: https://infisical.REPLACE_WITH_YOUR_TAILNET.ts.net
 
 # Set these with `pulumi config set --secret`, never in this file:
 # - kubeconfig

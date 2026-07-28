@@ -58,7 +58,10 @@ export function createInfisical(
         stringData: {
             ENCRYPTION_KEY: required.infisicalEncryptionKey,
             AUTH_SECRET: required.infisicalAuthSecret,
+            HOST: "0.0.0.0",
+            SITE_URL: required.infisicalSiteUrl,
             TELEMETRY_ENABLED: "false",
+            DISABLE_UPDATE_CHECK: "true",
         },
     }, { provider });
 

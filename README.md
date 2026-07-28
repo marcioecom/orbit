@@ -48,11 +48,12 @@ pulumi stack init orbit-eu
 pulumi config set cloudflareAccountId <account-id>
 pulumi config set backupBucketName orbit-eu-backups
 pulumi config set dataNodeSelector topology.kubernetes.io/region=<chosen-region>
+pulumi config set infisicalSiteUrl https://infisical.<your-tailnet>.ts.net
 pulumi config set --secret backupAccessKeyId <r2-access-key-id>
 pulumi config set --secret backupSecretAccessKey <r2-secret-access-key>
 pulumi config set --secret echoPostgresPassword <generated-password>
 pulumi config set --secret echoValkeyPassword <generated-password>
-pulumi config set --secret infisicalEncryptionKey <32-byte-base64-key>
+pulumi config set --secret infisicalEncryptionKey <16-byte-hex-key>
 pulumi config set --secret infisicalAuthSecret <generated-secret>
 pulumi config set --secret infisicalPostgresPassword <generated-password>
 pulumi config set --secret infisicalRedisPassword <generated-password>
