@@ -1,0 +1,70 @@
+# Cluster regional usando tres VPS Hetzner Cloud existentes.
+#
+# Antes de executar:
+#   1. Rebuild das VPS com Ubuntu 24.04.
+#   2. Remova firewalls e redes privadas atualmente associados as VPS.
+#   3. Confirme acesso SSH como root pela porta 22 usando ~/.ssh/id_ed25519.
+#   4. Remova da tailnet entradas antigas com os nomes orbit-eu-*.
+#   5. Confira se os IDs abaixo correspondem as locations indicadas.
+#
+# Segredos via variaveis de ambiente - NAO cole tokens neste arquivo:
+#   export HCLOUD_TOKEN="..."
+#   export TAILSCALE_AUTH_KEY="tskey-auth-..."
+
+cluster_name: orbit-eu
+kubeconfig_path: "/Users/marciojunior/code/leapstark/orbit/k3s/kubeconfig-orbit-eu"
+k3s_version: v1.32.0+k3s1
+config_format_version: 1
+protect_against_deletion: true
+
+networking:
+  ssh:
+    port: 22
+    use_agent: false
+    use_private_ip: false
+    public_key_path: "~/.ssh/id_ed25519.pub"
+    private_key_path: "~/.ssh/id_ed25519"
+  tailscale:
+    enabled: true
+    hostname_suffix: "tailf1b93c.ts.net"
+  allowed_networks:
+    # Fallback administrativo pelo IP publico caso o Tailscale fique indisponivel.
+    ssh:
+      - 45.234.138.51/32
+    api:
+      - 45.234.138.51/32
+  public_network:
+    ipv4: true
+    ipv6: true
+    use_local_firewall: false
+  private_network:
+    enabled: true
+    subnet: 10.0.0.0/16
+    existing_network_name: ""
+
+masters_pool:
+  instance_type: cx23
+  instance_count: 1
+  locations:
+    - nbg1
+  existing_server_ids:
+    - 132237677
+
+worker_node_pools:
+  - name: falkenstein
+    instance_type: cx23
+    instance_count: 1
+    location: fsn1
+    existing_server_ids:
+      - 151360380
+
+  - name: helsinki
+    instance_type: cx23
+    instance_count: 1
+    location: hel1
+    existing_server_ids:
+      - 154511781
+
+addons:
+  cluster_autoscaler:
+    enabled: false
