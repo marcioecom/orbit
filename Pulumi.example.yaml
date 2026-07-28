@@ -1,0 +1,21 @@
+config:
+  orbit:clusterName: orbit-eu
+  orbit:storageClassName: hcloud-volumes
+  # Select a single data location after measuring private node-to-node latency.
+  # orbit:dataNodeSelector: topology.kubernetes.io/region=fsn1
+  orbit:cloudflareAccountId: REPLACE_ME
+  orbit:backupBucketName: orbit-eu-backups
+  orbit:cloudflaredEnabled: false
+  orbit:tailscaleOperatorEnabled: true
+
+# Set these with `pulumi config set --secret`, never in this file:
+# - kubeconfig
+# - backupAccessKeyId
+# - backupSecretAccessKey
+# - echoPostgresPassword
+# - echoValkeyPassword
+# - infisicalEncryptionKey
+# - infisicalAuthSecret
+# - infisicalPostgresPassword
+# - infisicalRedisPassword
+# - tailscaleOAuthClientId and tailscaleOAuthClientSecret when tailscaleOperatorEnabled=true
