@@ -2,7 +2,7 @@ import * as k8s from "@pulumi/kubernetes";
 import { required, settings } from "./config";
 import type { Namespaces } from "./namespaces";
 
-const valkeyChart = { repo: "https://charts.bitnami.com/bitnami", version: "6.2.2" };
+const valkeyChart = { repository: "https://charts.bitnami.com/bitnami", version: "6.2.2" };
 
 function dataNodeSelector() {
     if (settings.dataNodeSelector === "") {
@@ -71,7 +71,8 @@ export function createDataServices(
 
     const echoValkey = new k8s.helm.v3.Chart("echo-valkey", {
         chart: "valkey",
-        ...valkeyChart,
+        version: valkeyChart.version,
+        fetchOpts: { repo: valkeyChart.repository },
         namespace: namespaces.echo.metadata.name,
         values: {
             architecture: "standalone",

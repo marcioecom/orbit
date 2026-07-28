@@ -2,14 +2,15 @@ import * as k8s from "@pulumi/kubernetes";
 import type { Namespaces } from "./namespaces";
 
 const charts = {
-    prometheus: { repo: "https://prometheus-community.github.io/helm-charts", version: "87.19.1" },
-    loki: { repo: "https://grafana.github.io/helm-charts", version: "7.1.0" },
+    prometheus: { repository: "https://prometheus-community.github.io/helm-charts", version: "87.19.1" },
+    loki: { repository: "https://grafana.github.io/helm-charts", version: "7.1.0" },
 } as const;
 
 export function createObservability(provider: k8s.Provider, namespaces: Namespaces) {
     const monitoring = new k8s.helm.v3.Chart("kube-prometheus-stack", {
         chart: "kube-prometheus-stack",
-        ...charts.prometheus,
+        version: charts.prometheus.version,
+        fetchOpts: { repo: charts.prometheus.repository },
         namespace: namespaces.observability.metadata.name,
         values: {
             grafana: {
@@ -54,7 +55,8 @@ export function createObservability(provider: k8s.Provider, namespaces: Namespac
 
     const loki = new k8s.helm.v3.Chart("loki", {
         chart: "loki",
-        ...charts.loki,
+        version: charts.loki.version,
+        fetchOpts: { repo: charts.loki.repository },
         namespace: namespaces.observability.metadata.name,
         values: {
             deploymentMode: "SingleBinary",

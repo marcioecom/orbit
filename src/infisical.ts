@@ -3,7 +3,7 @@ import { required, settings } from "./config";
 import type { Namespaces } from "./namespaces";
 
 const chart = {
-    repo: "https://dl.cloudsmith.io/public/infisical/helm-charts/helm/charts/",
+    repository: "https://dl.cloudsmith.io/public/infisical/helm-charts/helm/charts/",
     version: "1.10.0",
 };
 
@@ -67,7 +67,8 @@ export function createInfisical(
 
     const instance = new k8s.helm.v3.Chart("infisical", {
         chart: "infisical-standalone",
-        ...chart,
+        version: chart.version,
+        fetchOpts: { repo: chart.repository },
         namespace: namespaces.secrets.metadata.name,
         values: {
             ingress: { enabled: false, nginx: { enabled: false } },
