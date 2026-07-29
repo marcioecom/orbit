@@ -20,7 +20,7 @@ function dataNodeSelector() {
 export function createDataServices(
     provider: k8s.Provider,
     namespaces: Namespaces,
-    cloudnativePg: k8s.helm.v3.Chart,
+    cloudnativePg: k8s.helm.v3.Release,
     backupCredentials: k8s.core.v1.Secret,
 ) {
     const postgresBootstrap = new k8s.core.v1.Secret("echo-postgres-bootstrap", {
@@ -69,10 +69,11 @@ export function createDataServices(
         },
     }, { provider, dependsOn: [cloudnativePg, postgresBootstrap, backupCredentials] });
 
-    const echoValkey = new k8s.helm.v3.Chart("echo-valkey", {
+    const echoValkey = new k8s.helm.v3.Release("echo-valkey", {
+        name: "echo-valkey",
         chart: "valkey",
         version: valkeyChart.version,
-        fetchOpts: { repo: valkeyChart.repository },
+        repositoryOpts: { repo: valkeyChart.repository },
         namespace: namespaces.echo.metadata.name,
         values: {
             architecture: "standalone",

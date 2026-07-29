@@ -1,19 +1,47 @@
 import * as k8s from "@pulumi/kubernetes";
+import { required } from "./config";
 import type { Namespaces } from "./namespaces";
 
 const charts = {
     prometheus: { repository: "https://prometheus-community.github.io/helm-charts", version: "87.19.1" },
+    prometheusOperatorCrds: {
+        repository: "https://prometheus-community.github.io/helm-charts",
+        version: "30.0.1",
+    },
     loki: { repository: "https://grafana.github.io/helm-charts", version: "7.1.0" },
 } as const;
 
 export function createObservability(provider: k8s.Provider, namespaces: Namespaces) {
-    const monitoring = new k8s.helm.v3.Chart("kube-prometheus-stack", {
+    const prometheusOperatorCrds = new k8s.helm.v3.Release("prometheus-operator-crds", {
+        name: "prometheus-operator-crds",
+        chart: "prometheus-operator-crds",
+        version: charts.prometheusOperatorCrds.version,
+        repositoryOpts: { repo: charts.prometheusOperatorCrds.repository },
+        namespace: namespaces.observability.metadata.name,
+        skipCrds: false,
+    }, { provider });
+
+    const grafanaAdminCredentials = new k8s.core.v1.Secret("grafana-admin-credentials", {
+        metadata: {
+            namespace: namespaces.observability.metadata.name,
+            name: "grafana-admin-credentials",
+        },
+        stringData: {
+            "admin-user": "admin",
+            "admin-password": required.grafanaAdminPassword,
+        },
+    }, { provider });
+
+    const monitoring = new k8s.helm.v3.Release("kube-prometheus-stack", {
+        name: "kube-prometheus-stack",
         chart: "kube-prometheus-stack",
         version: charts.prometheus.version,
-        fetchOpts: { repo: charts.prometheus.repository },
+        repositoryOpts: { repo: charts.prometheus.repository },
         namespace: namespaces.observability.metadata.name,
         values: {
+            crds: { enabled: false },
             grafana: {
+                admin: { existingSecret: grafanaAdminCredentials.metadata.name },
                 persistence: {
                     enabled: true,
                     storageClassName: "hcloud-volumes",
@@ -51,12 +79,13 @@ export function createObservability(provider: k8s.Provider, namespaces: Namespac
                 },
             },
         },
-    }, { provider });
+    }, { provider, dependsOn: [prometheusOperatorCrds, grafanaAdminCredentials] });
 
-    const loki = new k8s.helm.v3.Chart("loki", {
+    const loki = new k8s.helm.v3.Release("loki", {
+        name: "loki",
         chart: "loki",
         version: charts.loki.version,
-        fetchOpts: { repo: charts.loki.repository },
+        repositoryOpts: { repo: charts.loki.repository },
         namespace: namespaces.observability.metadata.name,
         values: {
             deploymentMode: "SingleBinary",
@@ -151,10 +180,33 @@ loki.write "default" {
         },
     }, { provider, dependsOn: [loki, alloyConfig] });
 
+    const grafanaTailnetIngress = new k8s.networking.v1.Ingress("grafana-tailnet", {
+        metadata: {
+            namespace: namespaces.observability.metadata.name,
+            annotations: {
+                "tailscale.com/hostname": "grafana",
+                "tailscale.com/tags": "tag:k8s",
+            },
+        },
+        spec: {
+            ingressClassName: "tailscale",
+            defaultBackend: {
+                service: {
+                    name: "kube-prometheus-stack-grafana",
+                    port: { number: 80 },
+                },
+            },
+            tls: [{ hosts: ["grafana"] }],
+        },
+    }, { provider, dependsOn: monitoring });
+
     return {
         monitoring,
+        prometheusOperatorCrds,
+        grafanaAdminCredentials,
         loki,
         alloy,
+        grafanaTailnetIngress,
         grafanaService: "kube-prometheus-stack-grafana.observability.svc.cluster.local",
     };
 }

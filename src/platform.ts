@@ -14,10 +14,11 @@ const charts = {
 } as const;
 
 export function createPlatform(provider: k8s.Provider, namespaces: Namespaces) {
-    const metricsServer = new k8s.helm.v3.Chart("metrics-server", {
+    const metricsServer = new k8s.helm.v3.Release("metrics-server", {
+        name: "metrics-server",
         chart: "metrics-server",
         version: charts.metricsServer.version,
-        fetchOpts: { repo: charts.metricsServer.repository },
+        repositoryOpts: { repo: charts.metricsServer.repository },
         namespace: namespaces.platform.metadata.name,
         values: {
             replicas: 1,
@@ -28,14 +29,15 @@ export function createPlatform(provider: k8s.Provider, namespaces: Namespaces) {
         },
     }, { provider });
 
-    const traefik = new k8s.helm.v3.Chart("traefik", {
+    const traefik = new k8s.helm.v3.Release("traefik", {
+        name: "traefik",
         chart: "traefik",
         version: charts.traefik.version,
-        fetchOpts: { repo: charts.traefik.repository },
+        repositoryOpts: { repo: charts.traefik.repository },
         namespace: namespaces.platform.metadata.name,
         values: {
             deployment: { replicas: 1 },
-            service: { type: "ClusterIP" },
+            service: { spec: { type: "ClusterIP" } },
             ingressClass: { enabled: true, isDefaultClass: true },
             providers: { kubernetesIngress: { enabled: true } },
             metrics: { prometheus: { enabled: true } },
@@ -46,12 +48,16 @@ export function createPlatform(provider: k8s.Provider, namespaces: Namespaces) {
         },
     }, { provider });
 
-    const cloudnativePg = new k8s.helm.v3.Chart("cloudnative-pg", {
+    const cloudnativePg = new k8s.helm.v3.Release("cloudnative-pg", {
+        name: "cloudnative-pg",
         chart: "cloudnative-pg",
         version: charts.cloudnativePg.version,
-        fetchOpts: { repo: charts.cloudnativePg.repository },
+        repositoryOpts: { repo: charts.cloudnativePg.repository },
         namespace: namespaces.data.metadata.name,
+        skipCrds: false,
+        takeOwnership: true,
         values: {
+            crds: { create: true },
             resources: {
                 requests: { cpu: "100m", memory: "128Mi" },
                 limits: { cpu: "300m", memory: "256Mi" },
@@ -59,14 +65,15 @@ export function createPlatform(provider: k8s.Provider, namespaces: Namespaces) {
         },
     }, { provider });
 
-    const infisicalOperator = new k8s.helm.v3.Chart("infisical-secrets-operator", {
+    const infisicalOperator = new k8s.helm.v3.Release("infisical-secrets-operator", {
+        name: "infisical-secrets-operator",
         chart: "secrets-operator",
         version: charts.infisicalOperator.version,
-        fetchOpts: { repo: charts.infisicalOperator.repository },
+        repositoryOpts: { repo: charts.infisicalOperator.repository },
         namespace: namespaces.secrets.metadata.name,
     }, { provider });
 
-    let tailscaleOperator: k8s.helm.v3.Chart | undefined;
+    let tailscaleOperator: k8s.helm.v3.Release | undefined;
     if (settings.tailscale.enabled) {
         const credentials = new k8s.core.v1.Secret("tailscale-operator-oauth", {
             metadata: { namespace: namespaces.platform.metadata.name },
@@ -76,10 +83,11 @@ export function createPlatform(provider: k8s.Provider, namespaces: Namespaces) {
             },
         }, { provider });
 
-        tailscaleOperator = new k8s.helm.v3.Chart("tailscale-operator", {
+        tailscaleOperator = new k8s.helm.v3.Release("tailscale-operator", {
+            name: "tailscale-operator",
             chart: "tailscale-operator",
             version: charts.tailscale.version,
-            fetchOpts: { repo: charts.tailscale.repository },
+            repositoryOpts: { repo: charts.tailscale.repository },
             namespace: namespaces.platform.metadata.name,
             values: {
                 oauth: {

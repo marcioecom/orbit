@@ -20,7 +20,7 @@ export function createNamespaces(provider: k8s.Provider): Namespaces {
                     name,
                     labels: {
                         "app.kubernetes.io/part-of": "orbit",
-                        "pod-security.kubernetes.io/enforce": "baseline",
+                        "pod-security.kubernetes.io/enforce": name === "observability" ? "privileged" : "baseline",
                     },
                 },
             }, { provider });

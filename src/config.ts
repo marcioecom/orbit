@@ -43,6 +43,12 @@ export const settings = {
         authSecret: config.getSecret("infisicalAuthSecret"),
         postgresPassword: config.getSecret("infisicalPostgresPassword"),
         redisPassword: config.getSecret("infisicalRedisPassword"),
+        resendApiKey: config.getSecret("infisicalResendApiKey"),
+        smtpFromAddress: config.get("infisicalSmtpFromAddress"),
+        smtpFromName: config.get("infisicalSmtpFromName") ?? "Infisical",
+    },
+    observability: {
+        grafanaAdminPassword: config.getSecret("grafanaAdminPassword"),
     },
 };
 
@@ -81,6 +87,10 @@ if (
     );
 }
 
+if (settings.observability.grafanaAdminPassword === undefined) {
+    throw new Error("Set the secret configuration value orbit:grafanaAdminPassword before deploying observability.");
+}
+
 if (
     settings.cloudflare.accountId === undefined ||
     settings.cloudflare.backupAccessKeyId === undefined ||
@@ -103,6 +113,7 @@ export const required = {
     infisicalAuthSecret: settings.infisical.authSecret!,
     infisicalPostgresPassword: settings.infisical.postgresPassword!,
     infisicalRedisPassword: settings.infisical.redisPassword!,
+    grafanaAdminPassword: settings.observability.grafanaAdminPassword!,
     tailscaleOAuthClientId: secrets.tailscaleOAuthClientId,
     tailscaleOAuthClientSecret: secrets.tailscaleOAuthClientSecret,
 };

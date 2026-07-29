@@ -6,7 +6,7 @@ import type { Namespaces } from "./namespaces";
 export function createEdge(
     provider: k8s.Provider,
     namespaces: Namespaces,
-    traefik: k8s.helm.v3.Chart,
+    traefik: k8s.helm.v3.Release,
 ) {
     const backupBucket = new cloudflare.R2Bucket("backups", {
         accountId: required.cloudflareAccountId,

@@ -57,6 +57,10 @@ pulumi config set --secret infisicalEncryptionKey <16-byte-hex-key>
 pulumi config set --secret infisicalAuthSecret <generated-secret>
 pulumi config set --secret infisicalPostgresPassword <generated-password>
 pulumi config set --secret infisicalRedisPassword <generated-password>
+pulumi config set infisicalSmtpFromAddress <verified-resend-sender-address>
+pulumi config set infisicalSmtpFromName Infisical
+pulumi config set --secret infisicalResendApiKey <resend-api-key>
+pulumi config set --secret grafanaAdminPassword <generated-password>
 pulumi config set --secret tailscaleOAuthClientId <oauth-client-id>
 pulumi config set --secret tailscaleOAuthClientSecret <oauth-client-secret>
 ```
