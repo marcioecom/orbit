@@ -36,6 +36,12 @@ export const settings = {
     echo: {
         postgresPassword: config.getSecret("echoPostgresPassword"),
         valkeyPassword: config.getSecret("echoValkeyPassword"),
+        infisicalUniversalAuthClientId: config.getSecret("echoInfisicalUniversalAuthClientId"),
+        infisicalUniversalAuthClientSecret: config.getSecret("echoInfisicalUniversalAuthClientSecret"),
+    },
+    ghcr: {
+        username: config.get("ghcrUsername"),
+        pullToken: config.getSecret("ghcrPullToken"),
     },
     infisical: {
         siteUrl: config.get("infisicalSiteUrl"),
@@ -101,6 +107,21 @@ if (
     );
 }
 
+if (
+    settings.echo.infisicalUniversalAuthClientId === undefined ||
+    settings.echo.infisicalUniversalAuthClientSecret === undefined
+) {
+    throw new Error(
+        "Set the secret configuration values orbit:echoInfisicalUniversalAuthClientId and orbit:echoInfisicalUniversalAuthClientSecret before deploying echo secret sync.",
+    );
+}
+
+if (settings.ghcr.username === undefined || settings.ghcr.pullToken === undefined) {
+    throw new Error(
+        "Set orbit:ghcrUsername and the secret configuration value orbit:ghcrPullToken before deploying image pull credentials.",
+    );
+}
+
 // The checks above keep the rest of the resource graph free from optional inputs.
 export const required = {
     cloudflareAccountId: settings.cloudflare.accountId!,
@@ -108,6 +129,10 @@ export const required = {
     backupSecretAccessKey: settings.cloudflare.backupSecretAccessKey!,
     echoPostgresPassword: settings.echo.postgresPassword!,
     echoValkeyPassword: settings.echo.valkeyPassword!,
+    echoInfisicalUniversalAuthClientId: settings.echo.infisicalUniversalAuthClientId!,
+    echoInfisicalUniversalAuthClientSecret: settings.echo.infisicalUniversalAuthClientSecret!,
+    ghcrUsername: settings.ghcr.username!,
+    ghcrPullToken: settings.ghcr.pullToken!,
     infisicalEncryptionKey: settings.infisical.encryptionKey!,
     infisicalSiteUrl: settings.infisical.siteUrl!,
     infisicalAuthSecret: settings.infisical.authSecret!,

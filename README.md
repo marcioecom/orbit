@@ -19,7 +19,9 @@ The first stack installs:
 - CloudNativePG and a single-instance Postgres cluster for Echo;
 - Valkey for Echo BullMQ queues;
 - self-hosted Infisical with its own CNPG database and private Tailscale ingress;
-- Infisical Secrets Operator;
+- Infisical Secrets Operator, plus the echo secret sync (`InfisicalSecret` CRs
+  replicating the `/shared`, `/api`, and `/worker` Infisical folders into the
+  `echo` namespace) and the shared GHCR pull credential;
 - Prometheus, Grafana, Alertmanager, Loki, and Grafana Alloy.
 
 The cluster has one control plane and only two schedulable workers. Every
@@ -53,6 +55,10 @@ pulumi config set --secret backupAccessKeyId <r2-access-key-id>
 pulumi config set --secret backupSecretAccessKey <r2-secret-access-key>
 pulumi config set --secret echoPostgresPassword <generated-password>
 pulumi config set --secret echoValkeyPassword <generated-password>
+pulumi config set --secret echoInfisicalUniversalAuthClientId <machine-identity-client-id>
+pulumi config set --secret echoInfisicalUniversalAuthClientSecret <machine-identity-client-secret>
+pulumi config set ghcrUsername <github-username>
+pulumi config set --secret ghcrPullToken <github-pat-with-read-packages>
 pulumi config set --secret infisicalEncryptionKey <16-byte-hex-key>
 pulumi config set --secret infisicalAuthSecret <generated-secret>
 pulumi config set --secret infisicalPostgresPassword <generated-password>
@@ -68,6 +74,20 @@ pulumi config set --secret tailscaleOAuthClientSecret <oauth-client-secret>
 For local runs, set `KUBECONFIG` to `k3s/kubeconfig-orbit-eu` instead of putting
 the kubeconfig in Pulumi state. For CI, inject the raw kubeconfig through the
 runner's secret store. Do not commit kubeconfigs.
+
+The echo machine identity is the one input that cannot be provisioned by
+Pulumi: create it in the Infisical UI (Organization Settings > Machine
+Identities, Universal Auth), grant it read access to the `echo` project `prod`
+environment, and copy the client ID and secret into the config values above.
+The identity, project folders (`/shared`, `/api`, `/worker`), and secret
+values live in Infisical; everything that lands in the cluster is declared in
+`src/echo.ts`.
+
+The GHCR pull credential is shared across projects but Kubernetes
+`imagePullSecrets` are namespace-scoped, so every project namespace needs its
+own copy. New project modules get one by calling `createGhcrPullSecret` from
+`src/ghcr.ts` with their namespace; the credential itself stays in the single
+`ghcrUsername`/`ghcrPullToken` config pair.
 
 Enable public application ingress when Echo has a public hostname:
 
@@ -99,6 +119,9 @@ Before deploying Echo, verify each of these paths:
 - CNPG reports a healthy primary and can create a backup in R2.
 - A restore into an isolated namespace succeeds.
 - Valkey authentication works from the Echo namespace.
+- Each `InfisicalSecret` in the echo namespace reports a successful sync and
+  the managed secrets `echo-shared-secrets`, `echo-api-secrets`, and
+  `echo-worker-secrets` exist.
 - Loki receives a test log line.
 - Alertmanager delivers a test alert to a configured receiver.
 

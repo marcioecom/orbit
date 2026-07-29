@@ -10,6 +10,7 @@ config:
   orbit:infisicalSiteUrl: https://infisical.REPLACE_WITH_YOUR_TAILNET.ts.net
   # orbit:infisicalSmtpFromAddress: platform@REPLACE_WITH_VERIFIED_DOMAIN
   # orbit:infisicalSmtpFromName: Infisical
+  orbit:ghcrUsername: REPLACE_WITH_GITHUB_USERNAME
 
 # Set these with `pulumi config set --secret`, never in this file:
 # - kubeconfig
@@ -17,6 +18,9 @@ config:
 # - backupSecretAccessKey
 # - echoPostgresPassword
 # - echoValkeyPassword
+# - echoInfisicalUniversalAuthClientId and echoInfisicalUniversalAuthClientSecret
+#   from the echo machine identity created in the Infisical UI
+# - ghcrPullToken (GitHub PAT with read:packages, shared by all projects pulling from GHCR)
 # - infisicalEncryptionKey
 # - infisicalAuthSecret
 # - infisicalPostgresPassword

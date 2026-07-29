@@ -1,6 +1,7 @@
 import * as pulumi from "@pulumi/pulumi";
 import { settings } from "./src/config";
 import { createDataServices } from "./src/data";
+import { createEchoSecrets } from "./src/echo";
 import { createEdge } from "./src/edge";
 import { createInfisical } from "./src/infisical";
 import { createNamespaces } from "./src/namespaces";
@@ -19,9 +20,11 @@ const data = createDataServices(
     edge.echoBackupCredentials,
 );
 const observability = createObservability(kubernetesProvider, namespaces);
+const echoSecrets = createEchoSecrets(kubernetesProvider, namespaces, platform.infisicalOperator);
 
 export const clusterName = settings.clusterName;
 export const namespaceNames = pulumi.all(Object.values(namespaces).map((namespace) => namespace.metadata.name));
+export const echoManagedSecretNames = pulumi.all(echoSecrets.secretSyncs.map((sync) => sync.metadata.name));
 export const echoPostgresService = data.echoPostgresService;
 export const echoValkeyService = data.echoValkeyService;
 export const grafanaService = observability.grafanaService;
