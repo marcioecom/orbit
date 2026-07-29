@@ -167,6 +167,7 @@ loki.relabel "pods" {
     regex         = "/var/log/pods/([^_]+)_([^_]+)_[^/]+/([^/]+)/.*"
     target_label  = "container"
     replacement   = "$3"
+  }
 }
 
 loki.write "default" {
