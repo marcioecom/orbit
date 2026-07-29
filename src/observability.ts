@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import * as k8s from "@pulumi/kubernetes";
 import { required } from "./config";
 import type { Namespaces } from "./namespaces";
@@ -10,6 +11,50 @@ const charts = {
     },
     loki: { repository: "https://grafana.github.io/helm-charts", version: "7.1.0" },
 } as const;
+
+const alloyConfigContents = `
+local.file_match "pods" {
+  path_targets = [{ __path__ = "/var/log/pods/*/*/*.log" }]
+}
+
+loki.source.file "pods" {
+  targets    = local.file_match.pods.targets
+  forward_to = [loki.relabel.pods.receiver]
+}
+
+loki.relabel "pods" {
+  forward_to = [loki.write.default.receiver]
+
+  rule {
+    source_labels = ["filename"]
+    regex         = "/var/log/pods/([^_]+)_([^_]+)_[^/]+/([^/]+)/.*"
+    target_label  = "namespace"
+    replacement   = "$1"
+  }
+
+  rule {
+    source_labels = ["filename"]
+    regex         = "/var/log/pods/([^_]+)_([^_]+)_[^/]+/([^/]+)/.*"
+    target_label  = "pod"
+    replacement   = "$2"
+  }
+
+  rule {
+    source_labels = ["filename"]
+    regex         = "/var/log/pods/([^_]+)_([^_]+)_[^/]+/([^/]+)/.*"
+    target_label  = "container"
+    replacement   = "$3"
+  }
+}
+
+loki.write "default" {
+  endpoint {
+    url = "http://loki-gateway.observability.svc.cluster.local/loki/api/v1/push"
+  }
+}
+`;
+
+const alloyConfigChecksum = createHash("sha256").update(alloyConfigContents).digest("hex");
 
 export function createObservability(provider: k8s.Provider, namespaces: Namespaces) {
     const prometheusOperatorCrds = new k8s.helm.v3.Release("prometheus-operator-crds", {
@@ -133,49 +178,12 @@ export function createObservability(provider: k8s.Provider, namespaces: Namespac
     }, { provider });
 
     const alloyConfig = new k8s.core.v1.ConfigMap("alloy-config", {
-        metadata: { namespace: namespaces.observability.metadata.name },
+        metadata: {
+            name: "alloy-config",
+            namespace: namespaces.observability.metadata.name,
+        },
         data: {
-            "config.alloy": `
-local.file_match "pods" {
-  path_targets = [{ __path__ = "/var/log/pods/*/*/*.log" }]
-}
-
-loki.source.file "pods" {
-  targets    = local.file_match.pods.targets
-  forward_to = [loki.relabel.pods.receiver]
-}
-
-loki.relabel "pods" {
-  forward_to = [loki.write.default.receiver]
-
-  rule {
-    source_labels = ["filename"]
-    regex         = "/var/log/pods/([^_]+)_([^_]+)_[^/]+/([^/]+)/.*"
-    target_label  = "namespace"
-    replacement   = "$1"
-  }
-
-  rule {
-    source_labels = ["filename"]
-    regex         = "/var/log/pods/([^_]+)_([^_]+)_[^/]+/([^/]+)/.*"
-    target_label  = "pod"
-    replacement   = "$2"
-  }
-
-  rule {
-    source_labels = ["filename"]
-    regex         = "/var/log/pods/([^_]+)_([^_]+)_[^/]+/([^/]+)/.*"
-    target_label  = "container"
-    replacement   = "$3"
-  }
-}
-
-loki.write "default" {
-  endpoint {
-    url = "http://loki-gateway.observability.svc.cluster.local/loki/api/v1/push"
-  }
-}
-`,
+            "config.alloy": alloyConfigContents,
         },
     }, { provider });
 
@@ -187,7 +195,10 @@ loki.write "default" {
         spec: {
             selector: { matchLabels: { "app.kubernetes.io/name": "alloy" } },
             template: {
-                metadata: { labels: { "app.kubernetes.io/name": "alloy" } },
+                metadata: {
+                    annotations: { "checksum/config": alloyConfigChecksum },
+                    labels: { "app.kubernetes.io/name": "alloy" },
+                },
                 spec: {
                     tolerations: [{ operator: "Exists" }],
                     containers: [{
