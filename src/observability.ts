@@ -47,6 +47,13 @@ export function createObservability(provider: k8s.Provider, namespaces: Namespac
                     storageClassName: "hcloud-volumes",
                     size: "2Gi",
                 },
+                additionalDataSources: [{
+                    name: "Loki",
+                    type: "loki",
+                    uid: "loki",
+                    access: "proxy",
+                    url: "http://loki-gateway.observability.svc.cluster.local",
+                }],
                 resources: {
                     requests: { cpu: "100m", memory: "256Mi" },
                     limits: { cpu: "300m", memory: "512Mi" },
@@ -135,7 +142,31 @@ local.file_match "pods" {
 
 loki.source.file "pods" {
   targets    = local.file_match.pods.targets
+  forward_to = [loki.relabel.pods.receiver]
+}
+
+loki.relabel "pods" {
   forward_to = [loki.write.default.receiver]
+
+  rule {
+    source_labels = ["filename"]
+    regex         = "/var/log/pods/([^_]+)_([^_]+)_[^/]+/([^/]+)/.*"
+    target_label  = "namespace"
+    replacement   = "$1"
+  }
+
+  rule {
+    source_labels = ["filename"]
+    regex         = "/var/log/pods/([^_]+)_([^_]+)_[^/]+/([^/]+)/.*"
+    target_label  = "pod"
+    replacement   = "$2"
+  }
+
+  rule {
+    source_labels = ["filename"]
+    regex         = "/var/log/pods/([^_]+)_([^_]+)_[^/]+/([^/]+)/.*"
+    target_label  = "container"
+    replacement   = "$3"
 }
 
 loki.write "default" {
