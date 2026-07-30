@@ -9,6 +9,16 @@ private networking, and Tailscale installation. Pulumi must not shell out to
 `hetzner-k3s`; the bootstrap and the in-cluster platform are separate lifecycle
 boundaries.
 
+The cluster file is a public template. It has no administrative IP or absolute
+project path. Run `hetzner-k3s` through `k3s/hetzner-k3s.sh`, which substitutes
+`ADMIN_CIDR` into a temporary configuration file and removes it on exit. The
+generated kubeconfig remains ignored by Git.
+
+```sh
+export ADMIN_CIDR="$(curl -fsS https://api.ipify.org)/32"
+./k3s/hetzner-k3s.sh create
+```
+
 ## Scope
 
 The first stack installs:

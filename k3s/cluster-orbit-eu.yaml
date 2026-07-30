@@ -1,5 +1,8 @@
 # Cluster regional usando tres VPS Hetzner Cloud existentes.
 #
+# Template publico. Execute pelo script k3s/hetzner-k3s.sh para preencher
+# ADMIN_CIDR sem persistir o IP administrativo neste repositorio.
+#
 # Antes de executar:
 #   1. Rebuild das VPS com Ubuntu 24.04.
 #   2. Remova firewalls e redes privadas atualmente associados as VPS.
@@ -12,7 +15,7 @@
 #   export TAILSCALE_AUTH_KEY="tskey-auth-..."
 
 cluster_name: orbit-eu
-kubeconfig_path: "/Users/marciojunior/code/leapstark/orbit/k3s/kubeconfig-orbit-eu"
+kubeconfig_path: "k3s/kubeconfig-orbit-eu"
 k3s_version: v1.32.0+k3s1
 config_format_version: 1
 protect_against_deletion: true
@@ -30,9 +33,9 @@ networking:
   allowed_networks:
     # Fallback administrativo pelo IP publico caso o Tailscale fique indisponivel.
     ssh:
-      - 45.234.138.51/32
+      - __ADMIN_CIDR__
     api:
-      - 45.234.138.51/32
+      - __ADMIN_CIDR__
   public_network:
     ipv4: true
     ipv6: true
