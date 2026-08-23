@@ -24,9 +24,11 @@ export const settings = {
         backupBucketName: config.get("backupBucketName") ?? "orbit-eu-backups",
         backupAccessKeyId: config.getSecret("backupAccessKeyId"),
         backupSecretAccessKey: config.getSecret("backupSecretAccessKey"),
+        zoneId: config.get("cloudflareZoneId"),
     },
     cloudflared: {
         enabled: config.getBoolean("cloudflaredEnabled") ?? false,
+        echoApiHostname: config.get("echoApiHostname") ?? "echo-api.marcio.run",
     },
     tailscale: {
         enabled: config.getBoolean("tailscaleOperatorEnabled") ?? true,
@@ -105,6 +107,10 @@ if (
     throw new Error(
         "Set orbit:cloudflareAccountId and the secret backup access keys before deploying backups.",
     );
+}
+
+if (settings.cloudflared.enabled && settings.cloudflare.zoneId === undefined) {
+    throw new Error("Set orbit:cloudflareZoneId before enabling the Cloudflare Tunnel.");
 }
 
 if (

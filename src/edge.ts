@@ -30,12 +30,38 @@ export function createEdge(
 
     let cloudflared: k8s.apps.v1.Deployment | undefined;
     let tunnel: cloudflare.ZeroTrustTunnelCloudflared | undefined;
+    let tunnelConfig: cloudflare.ZeroTrustTunnelCloudflaredConfig | undefined;
+    let echoApiDnsRecord: cloudflare.DnsRecord | undefined;
     if (settings.cloudflared.enabled) {
         tunnel = new cloudflare.ZeroTrustTunnelCloudflared("orbit-eu-tunnel", {
             accountId: required.cloudflareAccountId,
             name: `${settings.clusterName}-tunnel`,
             configSrc: "cloudflare",
         });
+
+        tunnelConfig = new cloudflare.ZeroTrustTunnelCloudflaredConfig("orbit-eu-tunnel-config", {
+            accountId: required.cloudflareAccountId,
+            tunnelId: tunnel.id,
+            config: {
+                ingresses: [
+                    {
+                        hostname: settings.cloudflared.echoApiHostname,
+                        service: "http://echo-api.echo.svc.cluster.local:80",
+                    },
+                    { service: "http_status:404" },
+                ],
+            },
+        }, { dependsOn: [tunnel] });
+
+        echoApiDnsRecord = new cloudflare.DnsRecord("echo-api-public-dns", {
+            zoneId: settings.cloudflare.zoneId!,
+            name: settings.cloudflared.echoApiHostname,
+            type: "CNAME",
+            content: tunnel.id.apply((id) => `${id}.cfargotunnel.com`),
+            proxied: true,
+            ttl: 1,
+        }, { dependsOn: [tunnel] });
+
         const tunnelToken = cloudflare.getZeroTrustTunnelCloudflaredTokenOutput({
             accountId: required.cloudflareAccountId,
             tunnelId: tunnel.id,
@@ -100,6 +126,8 @@ export function createEdge(
                                 capabilities: { drop: ["ALL"] },
                                 readOnlyRootFilesystem: true,
                                 runAsNonRoot: true,
+                                runAsUser: 65532,
+                                runAsGroup: 65532,
                             },
                         }],
                     },
@@ -108,5 +136,13 @@ export function createEdge(
         }, { provider, dependsOn: [traefik, tunnelTokenSecret] });
     }
 
-    return { backupBucket, dataBackupCredentials, echoBackupCredentials, cloudflared, tunnel };
+    return {
+        backupBucket,
+        dataBackupCredentials,
+        echoBackupCredentials,
+        cloudflared,
+        tunnel,
+        tunnelConfig,
+        echoApiDnsRecord,
+    };
 }

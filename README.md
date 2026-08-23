@@ -44,8 +44,9 @@ location failure requires recovery, not automatic failover.
 1. Confirm all nodes are `Ready` and the API is reachable only through Tailscale.
 2. Verify the host keys and measure private RTT between Nuremberg, Falkenstein,
    and Helsinki. Set `dataNodeSelector` to the chosen primary data location.
-3. Create a least-privilege Cloudflare API token for R2 bucket management and
-   export it as `CLOUDFLARE_API_TOKEN` in the local shell or CI environment.
+3. Create a least-privilege Cloudflare API token with R2, DNS, and Zero Trust
+   Tunnel permissions, and export it as `CLOUDFLARE_API_TOKEN` in the local
+   shell or CI environment.
 4. Create an R2 S3 access key limited to the backup bucket.
 5. Create a tagged Tailscale OAuth client for the Kubernetes Operator. Its ACL
    tag must be allowed to create the private Infisical proxy.
@@ -99,17 +100,19 @@ own copy. New project modules get one by calling `createGhcrPullSecret` from
 `src/ghcr.ts` with their namespace; the credential itself stays in the single
 `ghcrUsername`/`ghcrPullToken` config pair.
 
-Enable public application ingress when Echo has a public hostname:
+Enable public Echo access through the Cloudflare Tunnel:
 
 ```sh
 pulumi config set cloudflaredEnabled true
+pulumi config set cloudflareZoneId <cloudflare-zone-id>
+pulumi config set echoApiHostname echo-api.<cloudflare-zone-name>
 ```
 
-Pulumi creates the remotely managed Tunnel and retrieves the connector token.
-Add the hostname routes through a `ZeroTrustTunnelCloudflaredConfig` resource
-with the Echo hostnames when those services exist. Do not put Cloudflare Access
-in front of Twilio webhooks; enforce Twilio signature verification in `apps/api`
-instead.
+Pulumi creates the remotely managed Tunnel, retrieves the connector token,
+configures the Echo hostname to reach the `echo-api` ClusterIP Service, and
+creates the Cloudflare CNAME record. The Echo deployment does not need a
+Kubernetes Ingress for this route. Do not put Cloudflare Access in front of
+Twilio webhooks; enforce Twilio signature verification in `apps/api` instead.
 
 ## Apply And Verify
 

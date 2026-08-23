@@ -4,7 +4,7 @@ import type { Namespaces } from "./namespaces";
 
 const valkeyChart = { repository: "https://charts.bitnami.com/bitnami", version: "6.2.2" };
 
-function dataNodeSelector() {
+export function dataNodeSelector() {
     if (settings.dataNodeSelector === "") {
         return undefined;
     }
