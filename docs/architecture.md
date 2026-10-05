@@ -16,8 +16,8 @@ flowchart TB
         Edge[Edge<br/>R2 backup bucket · Cloudflare Tunnel]
         Infisical[Self-hosted Infisical<br/>own CNPG database · tailnet-only ingress]
         Observability[Prometheus · Grafana · Alertmanager · Loki · Alloy]
-        EchoProject[Echo project namespace<br/>Postgres · Valkey · InfisicalSecret syncs · tunnel route]
-        NightmintProject[NightMint project namespace<br/>InfisicalSecret syncs · GHCR pull secret]
+        EchoProject[Echo project namespace<br/>Postgres · Valkey · R2 object storage · InfisicalSecret syncs · tunnel route]
+        NightmintProject[NightMint project namespace<br/>Postgres · InfisicalSecret syncs · GHCR pull secret]
     end
 
     VMs --> NS
@@ -31,19 +31,23 @@ flowchart TB
     Edge -->|Cloudflare Tunnel| EchoProject
 
     Cloudflare[(Cloudflare<br/>R2 + Zero Trust Tunnel)] <--> Edge
+    Cloudflare -->|R2 object storage| EchoProject
     Tailscale[(Tailscale tailnet)] <--> Infisical
 ```
 
 ## Module responsibilities
 
 - `index.ts`: composition root. Wires namespaces → platform → edge → Infisical → per-project modules → observability, in that order.
-- `src/namespaces.ts`: creates the five baseline namespaces (`platform`, `edge`, `data`, `secrets`, `observability`) shared by every project.
+- `src/namespaces.ts`: creates the five baseline namespaces (`platform`, `edge`, `data`, `secrets`, `observability`) shared by every project. Project namespaces (`echo`, `nightmint`) are created by each project module itself via `src/projects/namespace.ts`.
 - `src/platform.ts`: installs cluster-wide Helm releases — metrics-server, Traefik (private ingress), CloudNativePG operator, Infisical Secrets Operator, and conditionally the Tailscale Kubernetes Operator.
-- `src/edge.ts`: provisions the Cloudflare R2 backup bucket, per-namespace backup credentials, and (when `cloudflaredEnabled`) the Cloudflare Zero Trust Tunnel plus its in-cluster `cloudflared` deployment. `configureTunnelRoutes` attaches each project's public hostname to the shared tunnel.
+- `src/edge.ts`: provisions the Cloudflare R2 backup bucket and, when `cloudflaredEnabled`, the Cloudflare Zero Trust Tunnel plus its in-cluster `cloudflared` deployment. `configureTunnelRoutes` is a composable helper that attaches any number of projects' public hostnames to the one shared tunnel.
+- `src/backup-credentials.ts`: shared factory for the per-project R2 backup credentials Secret (`r2-<project>-backup-credentials`), scoped to each project's own namespace instead of one cluster-wide secret.
 - `src/infisical.ts`: deploys self-hosted Infisical with its own CloudNativePG-managed Postgres, SMTP config, and a tailnet-only Ingress — the only ingress Infisical exposes.
 - `src/observability.ts`: installs Prometheus, Grafana, Alertmanager, and Loki, plus a Grafana Alloy config (embedded here as a checksummed string) that ships pod logs into Loki.
-- `src/projects/echo/*`: Echo's dedicated namespace, CloudNativePG Postgres cluster + scheduled R2 backup, Valkey (BullMQ), `InfisicalSecret` syncs for `/shared`, `/api`, `/worker`, and the Cloudflare Tunnel route for `echo-api`.
-- `src/projects/nightmint.ts`: NightMint's namespace, its own Infisical project/environment wiring, and a shared GHCR pull secret via `src/ghcr.ts`.
+- `src/projects/<name>/`: one module per workload, all following the same shape — `index.ts` (composition), `config.ts` (that project's own `pulumi.Config(<name>)` namespace), `data.ts` (stateful resources), `secrets.ts` (`InfisicalSecret` syncs + GHCR pull secret), and `edge.ts`/`storage.ts` where a project needs a public route or its own object storage.
+  - `echo/`: Postgres + Valkey (BullMQ), a dedicated R2 bucket for object storage (`storage.ts` — see the comment there on why its credentials live in Infisical, not Pulumi config), `InfisicalSecret` syncs for `/shared`, `/api`, `/worker`, and the Cloudflare Tunnel route for `echo-api`.
+  - `nightmint/`: Postgres and `InfisicalSecret` syncs for `/postgres`, `/indexer`, `/keeper`.
+- `src/projects/namespace.ts`: shared `createProjectNamespace` factory used by every project module.
 - `src/projects/node-selector.ts`: parses `orbit:dataNodeSelector` (`label=value`) so every project can pin stateful workloads to the same chosen data-plane node.
 
 ## Deployment lifecycle boundary

@@ -1,41 +1,40 @@
+import * as cloudflare from "@pulumi/cloudflare";
 import * as k8s from "@pulumi/kubernetes";
-import { required, settings } from "./config";
-import type { Namespaces } from "./namespaces";
+import { createBackupCredentials } from "../../backup-credentials";
+import { required, settings } from "../../config";
+import { dataNodeSelector } from "../node-selector";
+import { echoConfig } from "./config";
 
 const valkeyChart = { repository: "https://charts.bitnami.com/bitnami", version: "6.2.2" };
 
-export function dataNodeSelector() {
-    if (settings.dataNodeSelector === "") {
-        return undefined;
-    }
+/**
+ * Standard images bundle pgvector. ImageVolume sidecars need Kubernetes 1.33+;
+ * orbit-eu runs 1.32, so minimal + postgresql.extensions does not mount /extensions.
+ */
+const echoPostgresImage = "ghcr.io/cloudnative-pg/postgresql:18-standard-trixie";
 
-    const [key, value] = settings.dataNodeSelector.split("=", 2);
-    if (key === undefined || value === undefined || key === "" || value === "") {
-        throw new Error("orbit:dataNodeSelector must use the format label=value.");
-    }
-
-    return { [key]: value };
-}
-
-export function createDataServices(
+export function createEchoData(
     provider: k8s.Provider,
-    namespaces: Namespaces,
+    namespace: k8s.core.v1.Namespace,
     cloudnativePg: k8s.helm.v3.Release,
-    backupCredentials: k8s.core.v1.Secret,
+    backupBucket: cloudflare.R2Bucket,
 ) {
     const postgresBootstrap = new k8s.core.v1.Secret("echo-postgres-bootstrap", {
-        metadata: { namespace: namespaces.echo.metadata.name },
+        metadata: { namespace: namespace.metadata.name },
         stringData: {
             username: "echo",
-            password: required.echoPostgresPassword,
+            password: echoConfig.postgresPassword,
         },
     }, { provider });
+
+    const backupCredentials = createBackupCredentials(provider, "echo", namespace, backupBucket);
 
     const echoPostgres = new k8s.apiextensions.CustomResource("echo-postgres", {
         apiVersion: "postgresql.cnpg.io/v1",
         kind: "Cluster",
-        metadata: { namespace: namespaces.echo.metadata.name, name: "echo-postgres" },
+        metadata: { namespace: namespace.metadata.name, name: "echo-postgres" },
         spec: {
+            imageName: echoPostgresImage,
             instances: 1,
             resources: {
                 requests: { cpu: "400m", memory: "768Mi" },
@@ -52,9 +51,7 @@ export function createDataServices(
                 storageClass: settings.storageClassName,
                 size: "20Gi",
             },
-            affinity: {
-                nodeSelector: dataNodeSelector(),
-            },
+            affinity: { nodeSelector: dataNodeSelector() },
             backup: {
                 barmanObjectStore: {
                     destinationPath: `s3://${settings.cloudflare.backupBucketName}/cnpg/echo-postgres`,
@@ -69,15 +66,29 @@ export function createDataServices(
         },
     }, { provider, dependsOn: [cloudnativePg, postgresBootstrap, backupCredentials] });
 
+    const echoPostgresDatabase = new k8s.apiextensions.CustomResource("echo-postgres-database", {
+        apiVersion: "postgresql.cnpg.io/v1",
+        kind: "Database",
+        metadata: { namespace: namespace.metadata.name, name: "echo-postgres-database" },
+        spec: {
+            name: "echo",
+            owner: "echo",
+            cluster: { name: "echo-postgres" },
+            ensure: "present",
+            databaseReclaimPolicy: "retain",
+            extensions: [{ name: "vector", ensure: "present" }],
+        },
+    }, { provider, dependsOn: echoPostgres });
+
     const echoValkey = new k8s.helm.v3.Release("echo-valkey", {
         name: "echo-valkey",
         chart: "valkey",
         version: valkeyChart.version,
         repositoryOpts: { repo: valkeyChart.repository },
-        namespace: namespaces.echo.metadata.name,
+        namespace: namespace.metadata.name,
         values: {
             architecture: "standalone",
-            auth: { enabled: true, password: required.echoValkeyPassword },
+            auth: { enabled: true, password: echoConfig.valkeyPassword },
             primary: {
                 persistence: { enabled: true, storageClass: settings.storageClassName, size: "4Gi" },
                 resources: {
@@ -92,7 +103,7 @@ export function createDataServices(
     const echoPostgresBackup = new k8s.apiextensions.CustomResource("echo-postgres-backup", {
         apiVersion: "postgresql.cnpg.io/v1",
         kind: "ScheduledBackup",
-        metadata: { namespace: namespaces.echo.metadata.name, name: "echo-postgres-daily" },
+        metadata: { namespace: namespace.metadata.name, name: "echo-postgres-daily" },
         spec: {
             schedule: "0 0 3 * * *",
             immediate: true,
@@ -104,7 +115,9 @@ export function createDataServices(
 
     return {
         echoPostgres,
+        echoPostgresDatabase,
         echoPostgresBackup,
+        backupCredentials,
         echoPostgresService: "echo-postgres-rw.echo.svc.cluster.local",
         echoValkey,
         echoValkeyService: "echo-valkey-primary.echo.svc.cluster.local",

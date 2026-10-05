@@ -6,7 +6,6 @@ const namespaceDefinitions = {
     data: "data",
     secrets: "secrets",
     observability: "observability",
-    echo: "echo",
 } as const;
 
 export type NamespaceName = keyof typeof namespaceDefinitions;

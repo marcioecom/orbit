@@ -27,13 +27,23 @@ The first stack installs:
 - private Traefik ingress and metrics-server;
 - Tailscale Kubernetes Operator, used only to expose Infisical inside the tailnet;
 - Cloudflare R2 bucket for database backups and optional `cloudflared` replicas;
-- CloudNativePG and a single-instance Postgres cluster for Echo;
+- CloudNativePG and a single-instance Postgres cluster for Echo and for NightMint;
 - Valkey for Echo BullMQ queues;
+- a dedicated Cloudflare R2 bucket for Echo's object storage (`echo-storage`),
+  with CORS and a 24h lifecycle rule for pending knowledge-base uploads;
 - self-hosted Infisical with its own CNPG database and private Tailscale ingress;
-- Infisical Secrets Operator, plus the echo secret sync (`InfisicalSecret` CRs
-  replicating the `/shared`, `/api`, and `/worker` Infisical folders into the
-  `echo` namespace) and the shared GHCR pull credential;
+- Infisical Secrets Operator, plus per-project secret syncs (`InfisicalSecret`
+  CRs replicating Infisical folders into each project's namespace: `/shared`,
+  `/api`, `/worker` for Echo, `/postgres`, `/indexer`, `/keeper` for
+  NightMint) and the shared GHCR pull credential;
 - Prometheus, Grafana, Alertmanager, Loki, and Grafana Alloy.
+
+Each workload lives in its own `src/projects/<name>/` module
+(`index.ts`/`config.ts`/`data.ts`/`secrets.ts`, plus `edge.ts`/`storage.ts`
+where a project needs a public route or its own object storage). Shared
+platform concerns — namespaces, Helm add-ons, the backup bucket, Infisical,
+observability — stay in the top-level `src/*.ts` files so new projects only
+need to add a module and wire it up in `index.ts`.
 
 The cluster has one control plane and only two schedulable workers. Every
 stateful service therefore starts as a single instance with Hetzner volumes and
@@ -65,10 +75,6 @@ pulumi config set dataNodeSelector topology.kubernetes.io/region=<chosen-region>
 pulumi config set infisicalSiteUrl https://infisical.<your-tailnet>.ts.net
 pulumi config set --secret backupAccessKeyId <r2-access-key-id>
 pulumi config set --secret backupSecretAccessKey <r2-secret-access-key>
-pulumi config set --secret echoPostgresPassword <generated-password>
-pulumi config set --secret echoValkeyPassword <generated-password>
-pulumi config set --secret echoInfisicalUniversalAuthClientId <machine-identity-client-id>
-pulumi config set --secret echoInfisicalUniversalAuthClientSecret <machine-identity-client-secret>
 pulumi config set ghcrUsername <github-username>
 pulumi config set --secret ghcrPullToken <github-pat-with-read-packages>
 pulumi config set --secret infisicalEncryptionKey <16-byte-hex-key>
@@ -81,19 +87,41 @@ pulumi config set --secret infisicalResendApiKey <resend-api-key>
 pulumi config set --secret grafanaAdminPassword <generated-password>
 pulumi config set --secret tailscaleOAuthClientId <oauth-client-id>
 pulumi config set --secret tailscaleOAuthClientSecret <oauth-client-secret>
+
+# Echo (src/projects/echo/config.ts) — required unconditionally, independent
+# of whether the Cloudflare Tunnel is enabled below.
+pulumi config set echo:apiHostname echo-api.<cloudflare-zone-name>
+pulumi config set echo:webOrigin https://<echo-web-origin>
+pulumi config set echo:infisicalProjectSlug <echo-infisical-project-slug>
+pulumi config set --secret echo:postgresPassword <generated-password>
+pulumi config set --secret echo:valkeyPassword <generated-password>
+pulumi config set --secret echo:infisicalUniversalAuthClientId <machine-identity-client-id>
+pulumi config set --secret echo:infisicalUniversalAuthClientSecret <machine-identity-client-secret>
+
+# NightMint (src/projects/nightmint/config.ts) — required unconditionally.
+pulumi config set nightmint:infisicalProjectSlug <nightmint-infisical-project-slug>
+pulumi config set --secret nightmint:infisicalUniversalAuthClientId <machine-identity-client-id>
+pulumi config set --secret nightmint:infisicalUniversalAuthClientSecret <machine-identity-client-secret>
 ```
 
 For local runs, set `KUBECONFIG` to `k3s/kubeconfig-orbit-eu` instead of putting
 the kubeconfig in Pulumi state. For CI, inject the raw kubeconfig through the
 runner's secret store. Do not commit kubeconfigs.
 
-The echo machine identity is the one input that cannot be provisioned by
+Each project's machine identity is the one input that cannot be provisioned by
 Pulumi: create it in the Infisical UI (Organization Settings > Machine
-Identities, Universal Auth), grant it read access to the `echo` project `prod`
-environment, and copy the client ID and secret into the config values above.
-The identity, project folders (`/shared`, `/api`, `/worker`), and secret
-values live in Infisical; everything that lands in the cluster is declared in
-`src/echo.ts`.
+Identities, Universal Auth), grant it read access to that project's `prod`
+environment, and copy the client ID and secret into the `echo:*` or
+`nightmint:*` config values above. The identity, project folders (`/shared`,
+`/api`, `/worker` for Echo; `/postgres`, `/indexer`, `/keeper` for NightMint),
+and secret values live in Infisical; everything that lands in the cluster is
+declared in `src/projects/echo/secrets.ts` and
+`src/projects/nightmint/secrets.ts`.
+
+Echo's R2 object storage API credentials follow the same rule: they are not
+Pulumi config at all. Create a scoped Cloudflare R2 API token in the
+dashboard and store it directly in Infisical under echo's `/api` and `/worker`
+paths — see the comment in `src/projects/echo/storage.ts`.
 
 The GHCR pull credential is shared across projects but Kubernetes
 `imagePullSecrets` are namespace-scoped, so every project namespace needs its
@@ -106,14 +134,15 @@ Enable public Echo access through the Cloudflare Tunnel:
 ```sh
 pulumi config set cloudflaredEnabled true
 pulumi config set cloudflareZoneId <cloudflare-zone-id>
-pulumi config set echoApiHostname echo-api.<cloudflare-zone-name>
 ```
 
-Pulumi creates the remotely managed Tunnel, retrieves the connector token,
-configures the Echo hostname to reach the `echo-api` ClusterIP Service, and
-creates the Cloudflare CNAME record. The Echo deployment does not need a
-Kubernetes Ingress for this route. Do not put Cloudflare Access in front of
-Twilio webhooks; enforce Twilio signature verification in `apps/api` instead.
+Pulumi creates the remotely managed Tunnel, retrieves the connector token, and
+routes `echo:apiHostname` to the `echo-api` ClusterIP Service through
+`configureTunnelRoutes` in `src/edge.ts` — a composable helper that other
+projects can register additional hostnames with. The Echo deployment does not
+need a Kubernetes Ingress for this route. Do not put Cloudflare Access in
+front of Twilio webhooks; enforce Twilio signature verification in `apps/api`
+instead.
 
 ## Apply And Verify
 
