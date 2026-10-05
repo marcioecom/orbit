@@ -28,18 +28,11 @@ export const settings = {
     },
     cloudflared: {
         enabled: config.getBoolean("cloudflaredEnabled") ?? false,
-        echoApiHostname: config.get("echoApiHostname") ?? "echo-api.marcio.run",
     },
     tailscale: {
         enabled: config.getBoolean("tailscaleOperatorEnabled") ?? true,
         oauthClientId: config.getSecret("tailscaleOAuthClientId"),
         oauthClientSecret: config.getSecret("tailscaleOAuthClientSecret"),
-    },
-    echo: {
-        postgresPassword: config.getSecret("echoPostgresPassword"),
-        valkeyPassword: config.getSecret("echoValkeyPassword"),
-        infisicalUniversalAuthClientId: config.getSecret("echoInfisicalUniversalAuthClientId"),
-        infisicalUniversalAuthClientSecret: config.getSecret("echoInfisicalUniversalAuthClientSecret"),
     },
     ghcr: {
         username: config.get("ghcrUsername"),
@@ -77,12 +70,6 @@ if (!settings.tailscale.enabled) {
     throw new Error("tailscaleOperatorEnabled must remain true while Infisical uses a tailnet-only ingress.");
 }
 
-if (settings.echo.postgresPassword === undefined || settings.echo.valkeyPassword === undefined) {
-    throw new Error(
-        "Set the secret configuration values orbit:echoPostgresPassword and orbit:echoValkeyPassword before deploying data services.",
-    );
-}
-
 if (
     settings.infisical.siteUrl === undefined ||
     settings.infisical.encryptionKey === undefined ||
@@ -113,15 +100,6 @@ if (settings.cloudflared.enabled && settings.cloudflare.zoneId === undefined) {
     throw new Error("Set orbit:cloudflareZoneId before enabling the Cloudflare Tunnel.");
 }
 
-if (
-    settings.echo.infisicalUniversalAuthClientId === undefined ||
-    settings.echo.infisicalUniversalAuthClientSecret === undefined
-) {
-    throw new Error(
-        "Set the secret configuration values orbit:echoInfisicalUniversalAuthClientId and orbit:echoInfisicalUniversalAuthClientSecret before deploying echo secret sync.",
-    );
-}
-
 if (settings.ghcr.username === undefined || settings.ghcr.pullToken === undefined) {
     throw new Error(
         "Set orbit:ghcrUsername and the secret configuration value orbit:ghcrPullToken before deploying image pull credentials.",
@@ -133,10 +111,6 @@ export const required = {
     cloudflareAccountId: settings.cloudflare.accountId!,
     backupAccessKeyId: settings.cloudflare.backupAccessKeyId!,
     backupSecretAccessKey: settings.cloudflare.backupSecretAccessKey!,
-    echoPostgresPassword: settings.echo.postgresPassword!,
-    echoValkeyPassword: settings.echo.valkeyPassword!,
-    echoInfisicalUniversalAuthClientId: settings.echo.infisicalUniversalAuthClientId!,
-    echoInfisicalUniversalAuthClientSecret: settings.echo.infisicalUniversalAuthClientSecret!,
     ghcrUsername: settings.ghcr.username!,
     ghcrPullToken: settings.ghcr.pullToken!,
     infisicalEncryptionKey: settings.infisical.encryptionKey!,
