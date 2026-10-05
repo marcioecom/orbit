@@ -2,7 +2,8 @@
 
 Infrastructure as code for the shared `orbit-eu` platform. This project manages
 Kubernetes add-ons and Cloudflare R2 after `hetzner-k3s` has bootstrapped the
-existing Hetzner VMs.
+existing Hetzner VMs. See [`docs/architecture.md`](docs/architecture.md) for a
+sanitized diagram of every component this program provisions.
 
 `k3s/cluster-orbit-eu.yaml` remains the source of truth for VM adoption, k3s,
 private networking, and Tailscale installation. Pulumi must not shell out to
